@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -107,7 +106,7 @@ func getRandomQuote() (string, error) {
 
 	// API возвращает массив из одного объекта
 	var quotes []Quote
-	if err := json.Unmarshal(body, "es); err != nil {
+	if err := json.Unmarshal(body, &quotes); err != nil {
 		return "", fmt.Errorf("ошибка парсинга JSON: %w", err)
 	}
 
