@@ -37,13 +37,14 @@ func InitDB(cfg DatabaseConfig) error {
                         user_name VARCHAR(64) NOT NULL,
                         user_fio VARCHAR(255),
                         user_phone VARCHAR(10),
+                        user_birth DATE,
                         comment TEXT
                 )`,
                 `CREATE INDEX IF NOT EXISTS idx_snt_users_user_name ON snt_users(user_name)`,
                 `CREATE TABLE IF NOT EXISTS snt_details (
                         created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        id VARCHAR(8) NOT NULL PRIMARY KEY,
+                        id SERIAL PRIMARY KEY,
                         name VARCHAR(120) NOT NULL,
                         inn VARCHAR(10) NOT NULL,
                         kpp VARCHAR(9) NOT NULL,
@@ -70,6 +71,22 @@ func InitDB(cfg DatabaseConfig) error {
                         message TEXT,
                         details TEXT
                 )`,
+                `CREATE TABLE IF NOT EXISTS snt_debts (
+                        created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        area VARCHAR(12) NOT NULL PRIMARY KEY,
+                        debt DECIMAL(10,2) NOT NULL,
+                        debt_prev DECIMAL(10,2),
+                        comment TEXT
+                )`,
+                `CREATE TABLE IF NOT EXISTS snt_prices (
+                        created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        id SERIAL PRIMARY KEY,
+                        deposit DECIMAL(10,2) NOT NULL,
+                        electricity DECIMAL(10,2) NOT NULL,
+                        comment TEXT
+                )`,
         }
 
         for _, q := range queries {
@@ -83,11 +100,23 @@ func InitDB(cfg DatabaseConfig) error {
         err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM snt_details").Scan(&count)
         if err == nil && count == 0 {
                 _, err = db.Exec(context.Background(), `
-                        INSERT INTO snt_details (id, name, inn, kpp, personal_acc, bank_name, bik, corresp_acc, comment)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                `, "MAIN", "СНТ \"КОТЕЛЬЩИК\"", "2263006486", "226301001", "40703810202140010272", "АЛТАЙСКОЕ ОТДЕЛЕНИЕ N8644 ПАО СБЕРБАНК", "040173604", "30101810200000000604", "Первоначальное значение")
+                        INSERT INTO snt_details (name, inn, kpp, personal_acc, bank_name, bik, corresp_acc, comment)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `, "СНТ \"КОТЕЛЬЩИК\"", "2263006486", "226301001", "40703810202140010272", "АЛТАЙСКОЕ ОТДЕЛЕНИЕ N8644 ПАО СБЕРБАНК", "040173604", "30101810200000000604", "Первоначальное значение")
                 if err != nil {
                         log.Printf("Warning: failed to insert default snt_details: %v", err)
+                }
+        }
+
+        // Default record for snt_prices if empty
+        err = db.QueryRow(context.Background(), "SELECT COUNT(*) FROM snt_prices").Scan(&count)
+        if err == nil && count == 0 {
+                _, err = db.Exec(context.Background(), `
+                        INSERT INTO snt_prices (deposit, electricity, comment)
+                        VALUES ($1, $2, $3)
+                `, 1000, 5.04, "Первоначальные значения")
+                if err != nil {
+                        log.Printf("Warning: failed to insert default snt_prices: %v", err)
                 }
         }
 

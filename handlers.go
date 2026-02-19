@@ -276,7 +276,7 @@ func handleContacts(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 }
 
 func handlePaymentDetails(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-        rows, err := db.Query(context.Background(), "SELECT name, inn, kpp, personal_acc, bank_name, bik, corresp_acc FROM snt_details")
+        rows, err := db.Query(context.Background(), "SELECT name, inn, kpp, personal_acc, bank_name, bik, corresp_acc FROM snt_details ORDER BY id DESC LIMIT 1")
         if err != nil {
                 log.Printf("Error querying details: %v", err)
                 bot.Send(tgbotapi.NewMessage(msg.Chat.ID, "Ошибка получения реквизитов"))
