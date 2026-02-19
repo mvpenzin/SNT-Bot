@@ -86,6 +86,8 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
                         handleStart(bot, msg)
                 case "show":
                         handleShow(bot, msg)
+                case "me":
+                        handleUserInfo(bot, msg)
                 default:
                         reply := tgbotapi.NewMessage(msg.Chat.ID, "Неизвестная команда")
                         bot.Send(reply)
@@ -113,13 +115,13 @@ func handleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 }
 
 func handleStart(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-        // Add user to DB
+        // Add user to DB (user_add logic)
         _, err := db.Exec(context.Background(), `
-                INSERT INTO snt_users (telegram_id, username, first_name, last_name)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT (telegram_id) DO UPDATE 
-                SET username = EXCLUDED.username, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name
-        `, fmt.Sprint(msg.From.ID), msg.From.UserName, msg.From.FirstName, msg.From.LastName)
+                INSERT INTO snt_users (user_id, user_name)
+                VALUES ($1, $2)
+                ON CONFLICT (user_id) DO UPDATE 
+                SET user_name = EXCLUDED.user_name, modified = CURRENT_TIMESTAMP
+        `, msg.From.ID, msg.From.UserName)
         if err != nil {
                 log.Printf("Error adding user: %v", err)
                 LogBotAction("ERROR", "Failed to add user", err.Error())
@@ -131,38 +133,54 @@ func handleStart(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
         LogBotAction("INFO", "Start command", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
+func handleUserInfo(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+        var userID int64
+        var userName, userFio, userPhone *string
+        err := db.QueryRow(context.Background(), `
+                SELECT user_id, user_name, user_fio, user_phone 
+                FROM snt_users 
+                WHERE user_id = $1
+        `, msg.From.ID).Scan(&userID, &userName, &userFio, &userPhone)
+
+        if err != nil {
+                bot.Send(tgbotapi.NewMessage(msg.Chat.ID, "Информация о пользователе не найдена. Нажмите /start"))
+                return
+        }
+
+        fio := "не указано"
+        if userFio != nil {
+                fio = *userFio
+        }
+        phone := "не указано"
+        if userPhone != nil {
+                phone = *userPhone
+        }
+
+        text := fmt.Sprintf("Ваш профиль:\nID: %d\nЛогин: @%s\nФИО: %s\nТелефон: %s",
+                userID, *userName, fio, phone)
+        bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
+}
+
 func handleShow(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-        reply := tgbotapi.NewMessage(msg.Chat.ID, "Меню показано/скрыто")
-        // Toggle logic is tricky with reply keyboards as we can't easily check current state on client.
-        // We'll just resend the keyboard. To hide, we'd use NewRemoveKeyboard(true).
-        // Since user asked to "Show or hide", maybe we check if we should send keyboard or remove it?
-        // Let's just send the keyboard again as "Show". 
-        // To "Toggle", we'd need to track state per user, which is overkill for now.
-        // Let's assume "show" brings it back if hidden.
+        reply := tgbotapi.NewMessage(msg.Chat.ID, "Меню показано")
         reply.ReplyMarkup = menuKeyboard
         bot.Send(reply)
 }
 
 func handleWeather(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-        // Mock implementation as OpenWeatherMap requires API key
         reply := tgbotapi.NewMessage(msg.Chat.ID, "Погода в Барнауле: +20°C, Солнечно (Mock)")
-        // reply.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true) // User said "Menu hide"
-        // Actually user said "Menu hide" for all these commands.
-        // reply.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
         bot.Send(reply)
         LogBotAction("INFO", "Weather requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
 func handleTrains(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-        // Mock implementation
         reply := tgbotapi.NewMessage(msg.Chat.ID, "Расписание электричек:\n08:00 - Барнаул -> СНТ\n18:00 - СНТ -> Барнаул")
-        // reply.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
         bot.Send(reply)
         LogBotAction("INFO", "Trains requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
 func handleContacts(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-        rows, err := db.Query(context.Background(), "SELECT name, description, phone, email FROM snt_contacts")
+        rows, err := db.Query(context.Background(), "SELECT prior, type, value, adds FROM snt_contacts ORDER BY prior ASC")
         if err != nil {
                 log.Printf("Error querying contacts: %v", err)
                 bot.Send(tgbotapi.NewMessage(msg.Chat.ID, "Ошибка получения контактов"))
@@ -175,33 +193,53 @@ func handleContacts(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
         found := false
         for rows.Next() {
                 found = true
-                var name, desc, phone, email string
-                // handle NULLs
-                var d, p, e *string
-                if err := rows.Scan(&name, &d, &p, &e); err != nil {
+                var prior int
+                var cType, value string
+                var adds *string
+                if err := rows.Scan(&prior, &cType, &value, &adds); err != nil {
                         continue
                 }
-                if d != nil { desc = *d }
-                if p != nil { phone = *p }
-                if e != nil { email = *e }
-                
-                sb.WriteString(fmt.Sprintf("- %s: %s (%s, %s)\n", name, desc, phone, email))
+                addInfo := ""
+                if adds != nil {
+                        addInfo = " (" + *adds + ")"
+                }
+                sb.WriteString(fmt.Sprintf("- %s: %s%s\n", cType, value, addInfo))
         }
 
         if !found {
                 sb.WriteString("Контактов пока нет.")
         }
 
-        reply := tgbotapi.NewMessage(msg.Chat.ID, sb.String())
-        // reply.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-        bot.Send(reply)
+        bot.Send(tgbotapi.NewMessage(msg.Chat.ID, sb.String()))
         LogBotAction("INFO", "Contacts requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
 func handlePaymentDetails(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-        reply := tgbotapi.NewMessage(msg.Chat.ID, "Реквизиты для оплаты:\nООО 'СНТ'\nИНН 1234567890\nР/с 40702810000000000000")
-        // reply.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-        bot.Send(reply)
+        rows, err := db.Query(context.Background(), "SELECT name, inn, kpp, personal_acc, bank_name, bik, corresp_acc FROM snt_details")
+        if err != nil {
+                log.Printf("Error querying details: %v", err)
+                bot.Send(tgbotapi.NewMessage(msg.Chat.ID, "Ошибка получения реквизитов"))
+                return
+        }
+        defer rows.Close()
+
+        var sb strings.Builder
+        found := false
+        for rows.Next() {
+                found = true
+                var name, inn, kpp, acc, bank, bik, corr string
+                if err := rows.Scan(&name, &inn, &kpp, &acc, &bank, &bik, &corr); err != nil {
+                        continue
+                }
+                sb.WriteString(fmt.Sprintf("Реквизиты:\nПолучатель: %s\nИНН: %s\nКПП: %s\nСчет: %s\nБанк: %s\nБИК: %s\nКорр. счет: %s\n\n",
+                        name, inn, kpp, acc, bank, bik, corr))
+        }
+
+        if !found {
+                sb.WriteString("Реквизиты еще не настроены.")
+        }
+
+        bot.Send(tgbotapi.NewMessage(msg.Chat.ID, sb.String()))
         LogBotAction("INFO", "Payment details requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
@@ -212,21 +250,18 @@ func handleQuote(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
                 "Код как шутка. Если приходится объяснять — он плохой.",
         }
         reply := tgbotapi.NewMessage(msg.Chat.ID, quotes[rand.Intn(len(quotes))])
-        // reply.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
         bot.Send(reply)
         LogBotAction("INFO", "Quote requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
 func handleJoke(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
         reply := tgbotapi.NewMessage(msg.Chat.ID, "Заходит улитка в бар и говорит: 'Можно мне виски с колой?' Бармен: 'Простите, мы не обслуживаем улиток'. И вышвырнул её. Через неделю заходит та же улитка и спрашивает: 'Ну и зачем ты это сделал?'")
-        // reply.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
         bot.Send(reply)
         LogBotAction("INFO", "Joke requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
 func handleBash(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
         reply := tgbotapi.NewMessage(msg.Chat.ID, "<xxx> Привет, как дела?\n<yyy> Норм, код пишу.")
-        // reply.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
         bot.Send(reply)
         LogBotAction("INFO", "Bash requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
