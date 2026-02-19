@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"strings"
 
@@ -317,7 +316,7 @@ func handleWeather(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 		precip := f.Daily.PrecipitationSum[i]
 		wind := f.Daily.WindSpeed10MMax[i]
 
-		sb.WriteString(fmt.Sprintf("\n\n<b><u>%s:</u></b> %s, %.1f…%.1f°C, осадки %.1fмм, ветер %.1fм/с",
+		sb.WriteString(fmt.Sprintf("\n - <b>%s:</b> %s, %.1f…%.1f°C, осадки %.1fмм, ветер %.1fм/с",
 			date, weatherDescription(code), tMin, tMax, precip, wind))
 	}
 
@@ -343,7 +342,7 @@ func handleContacts(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	defer rows.Close()
 
 	var sb strings.Builder
-	sb.WriteString("Контакты СНТ:\n")
+	sb.WriteString("<b><u>Контакты СНТ:</u></b>")
 	found := false
 	for rows.Next() {
 		found = true
@@ -357,14 +356,16 @@ func handleContacts(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 		if adds != nil {
 			addInfo = " (" + *adds + ")"
 		}
-		sb.WriteString(fmt.Sprintf("- %s: %s%s\n", cType, value, addInfo))
+		sb.WriteString(fmt.Sprintf("\n - <b>%s:</b> %s%s", cType, value, addInfo))
 	}
 
 	if !found {
-		sb.WriteString("Контактов пока нет.")
+		sb.WriteString("\nКонтактов пока нет.")
 	}
 
-	bot.Send(tgbotapi.NewMessage(msg.Chat.ID, sb.String()))
+	reply := tgbotapi.NewMessage(msg.Chat.ID, sb.String())
+	reply.ParseMode = tgbotapi.ModeHTML
+	bot.Send(reply)
 	LogBotAction("INFO", "Contacts requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
@@ -397,13 +398,58 @@ func handlePaymentDetails(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	LogBotAction("INFO", "Payment details requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }
 
-func handleQuote(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-	// Mock
-	quotes := []string{
-		"Не волнуйтесь, если что-то не работает. Если бы всё работало, вас бы уволили.",
-		"Код как шутка. Если приходится объяснять — он плохой.",
+type ForismaticResponse struct {
+	QuoteText   string `json:"quoteText"`
+	QuoteAuthor string `json:"quoteAuthor"`
+}
+
+// GetRandomQuote получает случайную цитату на указанном языке
+func GetRandomQuote() (*ForismaticResponse, error) {
+	cfg, _ := LoadConfig("main.ini")
+	url := cfg.Quote.URL
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
 	}
-	reply := tgbotapi.NewMessage(msg.Chat.ID, quotes[rand.Intn(len(quotes))])
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// API может возвращать JSON с символами экранирования, убираем их
+	cleaned := strings.ReplaceAll(string(body), "\\'", "'")
+	cleaned = strings.ReplaceAll(cleaned, "\\\"", "\"")
+	cleaned = strings.ReplaceAll(cleaned, "\\n", "\n")
+
+	var quote ForismaticResponse
+	err = json.Unmarshal([]byte(cleaned), &quote)
+	if err != nil {
+		return nil, err
+	}
+
+	return &quote, nil
+}
+
+func handleQuote(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+	var sb strings.Builder
+	sb.WriteString("<b><u>Цитата:</u></b>")
+
+	quote, err := GetRandomQuote()
+	if err != nil {
+		sb.WriteString("\nОшибка получения цитаты.")
+	} else {
+		if quote.QuoteAuthor == "" {
+			quote.QuoteAuthor = "Автор неизвестен"
+		}
+		sb.WriteString(fmt.Sprintf("\n%s", quote.QuoteText))
+		sb.WriteString(fmt.Sprintf("\n<i>%s</i>", quote.QuoteAuthor))
+	}
+
+	reply := tgbotapi.NewMessage(msg.Chat.ID, sb.String())
+	reply.ParseMode = tgbotapi.ModeHTML
 	bot.Send(reply)
 	LogBotAction("INFO", "Quote requested", fmt.Sprintf("User: %s", msg.From.UserName))
 }

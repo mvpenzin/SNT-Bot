@@ -9,6 +9,7 @@ type Config struct {
 	Database DatabaseConfig
 	Server   ServerConfig
 	Weather  WeatherConfig
+	Quote    QuoteConfig
 }
 
 type TelegramConfig struct {
@@ -33,6 +34,10 @@ type WeatherConfig struct {
 	DAYS int
 	ZONE string
 	WIND string
+}
+
+type QuoteConfig struct {
+	URL string
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -62,6 +67,9 @@ func LoadConfig(path string) (*Config, error) {
 	config.Weather.DAYS = cfg.Section("weather").Key("days").MustInt(3)
 	config.Weather.ZONE = cfg.Section("weather").Key("zone").String()
 	config.Weather.WIND = cfg.Section("weather").Key("wind").String()
+
+	// Quote
+	config.Quote.URL = cfg.Section("quote").Key("url").String()
 
 	return config, nil
 }
