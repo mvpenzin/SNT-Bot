@@ -278,11 +278,7 @@ func weatherDescription(code int) string {
 }
 
 func handleWeather(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-	cfg, err := LoadConfig("main.ini")
-	if err != nil {
-		log.Printf("Failed to load main.ini: %v, using defaults/env", err)
-		cfg = &Config{}
-	}
+	cfg, _ := LoadConfig("main.ini")
 	url := fmt.Sprintf(cfg.Weather.URL, cfg.Weather.LAT, cfg.Weather.LON, cfg.Weather.PAST, cfg.Weather.DAYS, cfg.Weather.ZONE, cfg.Weather.WIND)
 
 	// Выполняем запрос
