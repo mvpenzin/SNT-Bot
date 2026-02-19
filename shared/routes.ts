@@ -1,5 +1,11 @@
-import { z } from 'zod';
-import { insertSntContactSchema, insertBotLogSchema, sntUsers, sntContacts, botLogs } from './schema';
+import { z } from "zod";
+import {
+  insertSntContactSchema,
+  insertBotLogSchema,
+  sntUsers,
+  sntContacts,
+  botLogs,
+} from "./schema";
 
 export const errorSchemas = {
   validation: z.object({
@@ -18,11 +24,11 @@ export const api = {
   // --- Bot Status & Logs ---
   status: {
     get: {
-      method: 'GET' as const,
-      path: '/api/status' as const,
+      method: "GET" as const,
+      path: "/api/status" as const,
       responses: {
         200: z.object({
-          status: z.enum(['running', 'stopped', 'error']),
+          status: z.enum(["running", "stopped", "error"]),
           uptime: z.number(),
           lastCheck: z.string(),
         }),
@@ -31,8 +37,8 @@ export const api = {
   },
   logs: {
     list: {
-      method: 'GET' as const,
-      path: '/api/logs' as const,
+      method: "GET" as const,
+      path: "/api/logs" as const,
       responses: {
         200: z.array(z.custom<typeof botLogs.$inferSelect>()),
       },
@@ -42,15 +48,15 @@ export const api = {
   // --- Contacts Management (Admin) ---
   contacts: {
     list: {
-      method: 'GET' as const,
-      path: '/api/contacts' as const,
+      method: "GET" as const,
+      path: "/api/contacts" as const,
       responses: {
         200: z.array(z.custom<typeof sntContacts.$inferSelect>()),
       },
     },
     create: {
-      method: 'POST' as const,
-      path: '/api/contacts' as const,
+      method: "POST" as const,
+      path: "/api/contacts" as const,
       input: insertSntContactSchema,
       responses: {
         201: z.custom<typeof sntContacts.$inferSelect>(),
@@ -58,8 +64,8 @@ export const api = {
       },
     },
     delete: {
-      method: 'DELETE' as const,
-      path: '/api/contacts/:id' as const,
+      method: "DELETE" as const,
+      path: "/api/contacts/:id" as const,
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,
@@ -68,7 +74,10 @@ export const api = {
   },
 };
 
-export function buildUrl(path: string, params?: Record<string, string | number>): string {
+export function buildUrl(
+  path: string,
+  params?: Record<string, string | number>,
+): string {
   let url = path;
   if (params) {
     Object.entries(params).forEach(([key, value]) => {

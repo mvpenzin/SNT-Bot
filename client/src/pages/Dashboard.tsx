@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { ru } from "date-fns/locale";
 
 export default function Dashboard() {
   const { data: status, isLoading: isLoadingStatus } = useBotStatus();
@@ -47,7 +48,13 @@ export default function Dashboard() {
                   className={`w-3 h-3 rounded-full ${status?.status === "running" ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`}
                 />
                 <div className="text-2xl font-bold capitalize">
-                  {status?.status || "Unknown"}
+                  {status?.status === "running"
+                    ? "работает"
+                    : status?.status === "stopped"
+                      ? "остановлена"
+                      : status?.status === "error"
+                        ? "ошибка"
+                        : "неизвестено"}
                 </div>
               </div>
             )}
@@ -56,6 +63,7 @@ export default function Dashboard() {
               {status?.lastCheck
                 ? formatDistanceToNow(new Date(status.lastCheck), {
                     addSuffix: true,
+                    locale: ru,
                   })
                 : "..."}
             </p>
@@ -105,7 +113,7 @@ export default function Dashboard() {
         {/* Live Logs Preview */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Логи</h2>
+            <h2 className="text-xl font-semibold">Системные логи</h2>
             <Badge variant="outline" className="font-mono text-xs">
               online
             </Badge>
