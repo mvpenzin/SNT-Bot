@@ -51,9 +51,9 @@ export default function Contacts() {
   const filteredContacts =
     contacts?.filter(
       (contact) =>
-        contact.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.value.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.comment?.toLowerCase().includes(searchTerm.toLowerCase()),
+        (contact.type?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+        (contact.value?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+        (contact.comment?.toLowerCase() || "").includes(searchTerm.toLowerCase()),
     ) || [];
 
   return (

@@ -16,19 +16,19 @@ import (
 var (
         menuKeyboard = tgbotapi.NewReplyKeyboard(
                 tgbotapi.NewKeyboardButtonRow(
-                        tgbotapi.NewKeyboardButton("Прогноз погоды"),
-                        tgbotapi.NewKeyboardButton("Расписание электричек"),
+                        tgbotapi.NewKeyboardButton("Профиль"),
+                        tgbotapi.NewKeyboardButton("Информация"),
                 ),
                 tgbotapi.NewKeyboardButtonRow(
-                        tgbotapi.NewKeyboardButton("Контакты"),
-                        tgbotapi.NewKeyboardButton("Реквизиты для оплаты"),
+                        tgbotapi.NewKeyboardButton("Оплата"),
+                        tgbotapi.NewKeyboardButton("Развлечения"),
                 ),
                 tgbotapi.NewKeyboardButtonRow(
-                        tgbotapi.NewKeyboardButton("Цитату!"),
-                        tgbotapi.NewKeyboardButton("Анекдот!"),
-                        tgbotapi.NewKeyboardButton("Баш!"),
+                        tgbotapi.NewKeyboardButton("Выйти"),
                 ),
         )
+        userTimers = make(map[int64]*time.Timer)
+        kbTimeout  = 60
 )
 
 func StartBot(cfg TelegramConfig) {
