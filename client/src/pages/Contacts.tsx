@@ -3,9 +3,10 @@ import { Layout } from "@/components/Layout";
 import {
   useContacts,
   useCreateContact,
+  useUpdateContact,
   useDeleteContact,
 } from "@/hooks/use-bot";
-import { insertSntContactSchema, type InsertSntContact } from "@shared/schema";
+import { insertSntContactSchema, type InsertSntContact, type SntContact } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -23,7 +24,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -40,19 +40,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Search, Phone, Mail, User } from "lucide-react";
-import { format } from "date-fns";
+import { Plus, Trash2, Search, Edit2, User } from "lucide-react";
 
 export default function Contacts() {
   const { data: contacts, isLoading } = useContacts();
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<SntContact | null>(null);
 
   const filteredContacts =
     contacts?.filter(
       (contact) =>
-        contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.description?.toLowerCase().includes(searchTerm.toLowerCase()),
+        contact.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.value.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.comment?.toLowerCase().includes(searchTerm.toLowerCase()),
     ) || [];
 
   return (
@@ -62,14 +63,16 @@ export default function Contacts() {
           <h1 className="text-3xl font-bold tracking-tight">Контакты</h1>
           <p className="text-muted-foreground">Управление контактами СНТ</p>
         </div>
-        <CreateContactDialog
-          open={isCreateOpen}
-          onOpenChange={setIsCreateOpen}
-        />
+        <Button 
+          onClick={() => setIsCreateOpen(true)}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Добавить
+        </Button>
       </div>
 
-      <div className="glass-panel rounded-xl border border-border/50 overflow-hidden">
-        {/* Toolbar */}
+      <div className="glass-panel rounded-xl border border-border/50 overflow-hidden mt-6">
         <div className="p-4 border-b border-border/50 bg-muted/20 flex gap-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -82,30 +85,29 @@ export default function Contacts() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-border/50">
-                <TableHead className="w-[10px]">#</TableHead>
+                <TableHead className="w-[80px]">Приор.</TableHead>
                 <TableHead className="w-[200px]">Тип</TableHead>
                 <TableHead className="min-w-[200px]">Значение</TableHead>
                 <TableHead>Дополнительно</TableHead>
                 <TableHead>Комментарий</TableHead>
-                <TableHead className="w-[100px] text-right">Действия</TableHead>
+                <TableHead className="w-[120px] text-right">Действия</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     Загрузка контактов...
                   </TableCell>
                 </TableRow>
               ) : filteredContacts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="h-48 text-center text-muted-foreground"
                   >
                     Контакты не найдены.
@@ -117,7 +119,10 @@ export default function Contacts() {
                     key={contact.prior}
                     className="hover:bg-muted/30 border-border/50"
                   >
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium text-center">
+                      {contact.prior}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                           <User className="w-4 h-4" />
@@ -129,26 +134,26 @@ export default function Contacts() {
                       {contact.value}
                     </TableCell>
                     <TableCell>
-                      {contact.phone && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Phone className="w-3 h-3 text-muted-foreground" />
-                          {contact.phone}
-                        </div>
-                      )}
+                      {contact.adds || "-"}
                     </TableCell>
                     <TableCell>
-                      {contact.email && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail className="w-3 h-3 text-muted-foreground" />
-                          {contact.email}
-                        </div>
-                      )}
+                      {contact.comment || "-"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DeleteContactButton
-                        id={contact.id}
-                        name={contact.name}
-                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingContact(contact)}
+                          className="hover:bg-primary/10 hover:text-primary"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <DeleteContactButton
+                          prior={contact.prior}
+                          type={contact.type}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -157,94 +162,124 @@ export default function Contacts() {
           </Table>
         </div>
       </div>
+
+      <ContactDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+      />
+      
+      {editingContact && (
+        <ContactDialog
+          open={!!editingContact}
+          onOpenChange={(open) => !open && setEditingContact(null)}
+          contact={editingContact}
+        />
+      )}
     </Layout>
   );
 }
 
-function CreateContactDialog({
+function ContactDialog({
   open,
   onOpenChange,
+  contact,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contact?: SntContact;
 }) {
-  const { mutate, isPending } = useCreateContact();
+  const createMutation = useCreateContact();
+  const updateMutation = useUpdateContact();
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   const form = useForm<InsertSntContact>({
     resolver: zodResolver(insertSntContactSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      phone: "",
-      email: "",
+    defaultValues: contact ? {
+      type: contact.type,
+      value: contact.value,
+      adds: contact.adds || "",
+      comment: contact.comment || "",
+    } : {
+      type: "",
+      value: "",
+      adds: "",
+      comment: "",
     },
   });
 
   const onSubmit = (data: InsertSntContact) => {
-    mutate(data, {
-      onSuccess: () => {
-        onOpenChange(false);
-        form.reset();
-      },
-    });
+    if (contact) {
+      updateMutation.mutate({ prior: contact.prior, contact: data }, {
+        onSuccess: () => {
+          onOpenChange(false);
+          form.reset();
+        },
+      });
+    } else {
+      createMutation.mutate(data, {
+        onSuccess: () => {
+          onOpenChange(false);
+          form.reset();
+        },
+      });
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
-          <Plus className="w-4 h-4 mr-2" />
-          Добавить
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] bg-card border-border">
         <DialogHeader>
-          <DialogTitle>Добавить контакт</DialogTitle>
-          <DialogDescription>Создание нового контакта СНТ</DialogDescription>
+          <DialogTitle>{contact ? "Изменить контакт" : "Добавить контакт"}</DialogTitle>
+          <DialogDescription>
+            {contact ? "Обновите информацию о контакте" : "Создание нового контакта СНТ"}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="type">Тип (например, Охрана)</Label>
             <Input
-              id="name"
-              {...form.register("name")}
-              placeholder="e.g. Security Post"
+              id="type"
+              {...form.register("type")}
+              placeholder="Введите тип контакта"
             />
-            {form.formState.errors.name && (
+            {form.formState.errors.type && (
               <p className="text-xs text-red-500">
-                {form.formState.errors.name.message}
+                {form.formState.errors.type.message}
               </p>
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="value">Значение (например, номер телефона)</Label>
             <Input
-              id="description"
-              {...form.register("description")}
-              placeholder="Role or location"
+              id="value"
+              {...form.register("value")}
+              placeholder="Введите значение"
+            />
+            {form.formState.errors.value && (
+              <p className="text-xs text-red-500">
+                {form.formState.errors.value.message}
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="adds">Дополнительно</Label>
+            <Input
+              id="adds"
+              {...form.register("adds")}
+              placeholder="Дополнительная информация"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                {...form.register("phone")}
-                placeholder="+7..."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                {...form.register("email")}
-                placeholder="email@example.com"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="comment">Комментарий</Label>
+            <Textarea
+              id="comment"
+              {...form.register("comment")}
+              placeholder="Ваш комментарий"
+            />
           </div>
           <DialogFooter className="pt-4">
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Creating..." : "Create Contact"}
+              {isPending ? "Сохранение..." : (contact ? "Сохранить" : "Создать")}
             </Button>
           </DialogFooter>
         </form>
@@ -253,7 +288,7 @@ function CreateContactDialog({
   );
 }
 
-function DeleteContactButton({ id, name }: { id: number; name: string }) {
+function DeleteContactButton({ prior, type }: { prior: number; type: string }) {
   const { mutate, isPending } = useDeleteContact();
 
   return (
@@ -269,20 +304,19 @@ function DeleteContactButton({ id, name }: { id: number; name: string }) {
       </AlertDialogTrigger>
       <AlertDialogContent className="bg-card border-border">
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Contact?</AlertDialogTitle>
+          <AlertDialogTitle>Удалить контакт?</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete <strong>{name}</strong>? This action
-            cannot be undone.
+            Вы уверены, что хотите удалить контакт <strong>{type}</strong>? Это действие нельзя отменить.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>Отмена</AlertDialogCancel>
           <AlertDialogAction
-            onClick={() => mutate(id)}
+            onClick={() => mutate(prior)}
             className="bg-red-500 hover:bg-red-600 text-white"
             disabled={isPending}
           >
-            {isPending ? "Deleting..." : "Delete"}
+            {isPending ? "Удаление..." : "Удалить"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

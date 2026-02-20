@@ -17,7 +17,7 @@ export const sntUsers = pgTable("snt_users", {
 export const sntContacts = pgTable("snt_contacts", {
   prior: serial("prior").primaryKey(),
   type: text("type").notNull(),
-  value: text("value"),
+  value: text("value").notNull(),
   adds: text("adds"),
   comment: text("comment"),
   created: timestamp("created").defaultNow(),

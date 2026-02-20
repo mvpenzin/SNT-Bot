@@ -77,26 +77,62 @@ export function useCreateContact() {
   });
 }
 
+export function useUpdateContact() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ prior, contact }: { prior: number; contact: InsertSntContact }) => {
+      const url = buildUrl(api.contacts.update.path, { prior });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contact),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update contact");
+      }
+      return api.contacts.update.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.contacts.list.path] });
+      toast({
+        title: "Контакт обновлен",
+        description: "Информация о контакте успешно сохранена.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 export function useDeleteContact() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (id: number) => {
-      const url = buildUrl(api.contacts.delete.path, { id });
+    mutationFn: async (prior: number) => {
+      const url = buildUrl(api.contacts.delete.path, { prior });
       const res = await fetch(url, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete contact");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.contacts.list.path] });
       toast({
-        title: "Contact deleted",
-        description: "The contact has been removed.",
+        title: "Контакт удален",
+        description: "Контакт был успешно удален.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });

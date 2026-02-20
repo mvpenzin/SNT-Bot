@@ -31,7 +31,7 @@ func StartAPIServer(cfg ServerConfig) {
 
         // Logs
         e.GET("/logs", func(c echo.Context) error {
-                rows, err := db.Query(context.Background(), "SELECT id, level, message, details, created_at FROM bot_logs ORDER BY created_at DESC LIMIT 100")
+                rows, err := db.Query(context.Background(), "SELECT id, level, message, details, created FROM snt_logs ORDER BY created DESC LIMIT 100")
                 if err != nil {
                         return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
                 }
@@ -59,7 +59,7 @@ func StartAPIServer(cfg ServerConfig) {
 
         // Contacts
         e.GET("/contacts", func(c echo.Context) error {
-                rows, err := db.Query(context.Background(), "SELECT id, name, description, phone, email FROM snt_contacts ORDER BY name")
+                rows, err := db.Query(context.Background(), "SELECT prior, type, value, adds, comment FROM snt_contacts ORDER BY prior")
                 if err != nil {
                         return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
                 }
@@ -67,18 +67,18 @@ func StartAPIServer(cfg ServerConfig) {
 
                 contacts := []map[string]interface{}{}
                 for rows.Next() {
-                        var id int
-                        var name string
-                        var description, phone, email *string
-                        if err := rows.Scan(&id, &name, &description, &phone, &email); err != nil {
+                        var prior int
+                        var cType, value string
+                        var adds, comment *string
+                        if err := rows.Scan(&prior, &cType, &value, &adds, &comment); err != nil {
                                 continue
                         }
                         contacts = append(contacts, map[string]interface{}{
-                                "id":          id,
-                                "name":        name,
-                                "description": description,
-                                "phone":       phone,
-                                "email":       email,
+                                "prior":   prior,
+                                "type":    cType,
+                                "value":   value,
+                                "adds":    adds,
+                                "comment": comment,
                         })
                 }
                 return c.JSON(http.StatusOK, contacts)
@@ -86,37 +86,67 @@ func StartAPIServer(cfg ServerConfig) {
 
         e.POST("/contacts", func(c echo.Context) error {
                 var input struct {
-                        Name        string  `json:"name"`
-                        Description *string `json:"description"`
-                        Phone       *string `json:"phone"`
-                        Email       *string `json:"email"`
+                        Type    string  `json:"type"`
+                        Value   string  `json:"value"`
+                        Adds    *string `json:"adds"`
+                        Comment *string `json:"comment"`
                 }
                 if err := c.Bind(&input); err != nil {
                         return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid input"})
                 }
 
-                var id int
-                err := db.QueryRow(context.Background(), "INSERT INTO snt_contacts (name, description, phone, email) VALUES ($1, $2, $3, $4) RETURNING id", input.Name, input.Description, input.Phone, input.Email).Scan(&id)
+                var prior int
+                err := db.QueryRow(context.Background(), "INSERT INTO snt_contacts (type, value, adds, comment) VALUES ($1, $2, $3, $4) RETURNING prior", input.Type, input.Value, input.Adds, input.Comment).Scan(&prior)
                 if err != nil {
                         return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
                 }
 
                 return c.JSON(http.StatusCreated, map[string]interface{}{
-                        "id":          id,
-                        "name":        input.Name,
-                        "description": input.Description,
-                        "phone":       input.Phone,
-                        "email":       input.Email,
+                        "prior":   prior,
+                        "type":    input.Type,
+                        "value":   input.Value,
+                        "adds":    input.Adds,
+                        "comment": input.Comment,
                 })
         })
 
-        e.DELETE("/contacts/:id", func(c echo.Context) error {
-                id, err := strconv.Atoi(c.Param("id"))
+        e.PUT("/contacts/:prior", func(c echo.Context) error {
+                prior, err := strconv.Atoi(c.Param("prior"))
                 if err != nil {
-                        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid ID"})
+                        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid prior ID"})
                 }
 
-                tag, err := db.Exec(context.Background(), "DELETE FROM snt_contacts WHERE id = $1", id)
+                var input struct {
+                        Type    string  `json:"type"`
+                        Value   string  `json:"value"`
+                        Adds    *string `json:"adds"`
+                        Comment *string `json:"comment"`
+                }
+                if err := c.Bind(&input); err != nil {
+                        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid input"})
+                }
+
+                _, err = db.Exec(context.Background(), "UPDATE snt_contacts SET type = $1, value = $2, adds = $3, comment = $4, modified = CURRENT_TIMESTAMP WHERE prior = $5", input.Type, input.Value, input.Adds, input.Comment, prior)
+                if err != nil {
+                        return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+                }
+
+                return c.JSON(http.StatusOK, map[string]interface{}{
+                        "prior":   prior,
+                        "type":    input.Type,
+                        "value":   input.Value,
+                        "adds":    input.Adds,
+                        "comment": input.Comment,
+                })
+        })
+
+        e.DELETE("/contacts/:prior", func(c echo.Context) error {
+                prior, err := strconv.Atoi(c.Param("prior"))
+                if err != nil {
+                        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid prior ID"})
+                }
+
+                tag, err := db.Exec(context.Background(), "DELETE FROM snt_contacts WHERE prior = $1", prior)
                 if err != nil {
                         return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
                 }
