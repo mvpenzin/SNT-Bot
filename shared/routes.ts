@@ -65,9 +65,9 @@ export const api = {
     },
     update: {
       method: "PUT" as const,
-      path: "/api/contacts/:prior" as const,
+      path: "/api/contacts/:id" as const,
       parameters: {
-        prior: z.coerce.number(),
+        id: z.coerce.number(),
       },
       input: insertSntContactSchema,
       responses: {
@@ -78,9 +78,9 @@ export const api = {
     },
     delete: {
       method: "DELETE" as const,
-      path: "/api/contacts/:prior" as const,
+      path: "/api/contacts/:id" as const,
       parameters: {
-        prior: z.coerce.number(),
+        id: z.coerce.number(),
       },
       responses: {
         204: z.void(),

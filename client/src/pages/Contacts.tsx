@@ -6,7 +6,11 @@ import {
   useUpdateContact,
   useDeleteContact,
 } from "@/hooks/use-bot";
-import { insertSntContactSchema, type InsertSntContact, type SntContact } from "@shared/schema";
+import {
+  insertSntContactSchema,
+  type InsertSntContact,
+  type SntContact,
+} from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -51,9 +55,15 @@ export default function Contacts() {
   const filteredContacts =
     contacts?.filter(
       (contact) =>
-        (contact.type?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-        (contact.value?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-        (contact.comment?.toLowerCase() || "").includes(searchTerm.toLowerCase()),
+        (contact.type?.toLowerCase() || "").includes(
+          searchTerm.toLowerCase(),
+        ) ||
+        (contact.value?.toLowerCase() || "").includes(
+          searchTerm.toLowerCase(),
+        ) ||
+        (contact.comment?.toLowerCase() || "").includes(
+          searchTerm.toLowerCase(),
+        ),
     ) || [];
 
   return (
@@ -63,7 +73,7 @@ export default function Contacts() {
           <h1 className="text-3xl font-bold tracking-tight">Контакты</h1>
           <p className="text-muted-foreground">Управление контактами СНТ</p>
         </div>
-        <Button 
+        <Button
           onClick={() => setIsCreateOpen(true)}
           className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
         >
@@ -89,8 +99,9 @@ export default function Contacts() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-border/50">
-                <TableHead className="w-[80px]">Приор.</TableHead>
-                <TableHead className="w-[200px]">Тип</TableHead>
+                <TableHead className="w-[10px]">#</TableHead>
+                <TableHead className="w-[10px]">Приор</TableHead>
+                <TableHead className="w-[100px]">Тип</TableHead>
                 <TableHead className="min-w-[200px]">Значение</TableHead>
                 <TableHead>Дополнительно</TableHead>
                 <TableHead>Комментарий</TableHead>
@@ -100,14 +111,14 @@ export default function Contacts() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     Загрузка контактов...
                   </TableCell>
                 </TableRow>
               ) : filteredContacts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={7}
                     className="h-48 text-center text-muted-foreground"
                   >
                     Контакты не найдены.
@@ -116,9 +127,12 @@ export default function Contacts() {
               ) : (
                 filteredContacts.map((contact) => (
                   <TableRow
-                    key={contact.prior}
+                    key={contact.id}
                     className="hover:bg-muted/30 border-border/50"
                   >
+                    <TableCell className="font-medium text-center">
+                      {contact.id}
+                    </TableCell>
                     <TableCell className="font-medium text-center">
                       {contact.prior}
                     </TableCell>
@@ -133,12 +147,8 @@ export default function Contacts() {
                     <TableCell className="text-muted-foreground">
                       {contact.value}
                     </TableCell>
-                    <TableCell>
-                      {contact.adds || "-"}
-                    </TableCell>
-                    <TableCell>
-                      {contact.comment || "-"}
-                    </TableCell>
+                    <TableCell>{contact.adds || "-"}</TableCell>
+                    <TableCell>{contact.comment || "-"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -163,11 +173,8 @@ export default function Contacts() {
         </div>
       </div>
 
-      <ContactDialog
-        open={isCreateOpen}
-        onOpenChange={setIsCreateOpen}
-      />
-      
+      <ContactDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+
       {editingContact && (
         <ContactDialog
           open={!!editingContact}
@@ -194,27 +201,32 @@ function ContactDialog({
 
   const form = useForm<InsertSntContact>({
     resolver: zodResolver(insertSntContactSchema),
-    defaultValues: contact ? {
-      type: contact.type,
-      value: contact.value,
-      adds: contact.adds || "",
-      comment: contact.comment || "",
-    } : {
-      type: "",
-      value: "",
-      adds: "",
-      comment: "",
-    },
+    defaultValues: contact
+      ? {
+          type: contact.type,
+          value: contact.value,
+          adds: contact.adds || "",
+          comment: contact.comment || "",
+        }
+      : {
+          type: "",
+          value: "",
+          adds: "",
+          comment: "",
+        },
   });
 
   const onSubmit = (data: InsertSntContact) => {
     if (contact) {
-      updateMutation.mutate({ prior: contact.prior, contact: data }, {
-        onSuccess: () => {
-          onOpenChange(false);
-          form.reset();
+      updateMutation.mutate(
+        { prior: contact.prior, contact: data },
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+            form.reset();
+          },
         },
-      });
+      );
     } else {
       createMutation.mutate(data, {
         onSuccess: () => {
@@ -229,9 +241,13 @@ function ContactDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-card border-border">
         <DialogHeader>
-          <DialogTitle>{contact ? "Изменить контакт" : "Добавить контакт"}</DialogTitle>
+          <DialogTitle>
+            {contact ? "Изменить контакт" : "Добавить контакт"}
+          </DialogTitle>
           <DialogDescription>
-            {contact ? "Обновите информацию о контакте" : "Создание нового контакта СНТ"}
+            {contact
+              ? "Обновите информацию о контакте"
+              : "Создание нового контакта СНТ"}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
@@ -279,7 +295,7 @@ function ContactDialog({
           </div>
           <DialogFooter className="pt-4">
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Сохранение..." : (contact ? "Сохранить" : "Создать")}
+              {isPending ? "Сохранение..." : contact ? "Сохранить" : "Создать"}
             </Button>
           </DialogFooter>
         </form>
@@ -306,7 +322,8 @@ function DeleteContactButton({ prior, type }: { prior: number; type: string }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Удалить контакт?</AlertDialogTitle>
           <AlertDialogDescription>
-            Вы уверены, что хотите удалить контакт <strong>{type}</strong>? Это действие нельзя отменить.
+            Вы уверены, что хотите удалить контакт <strong>{type}</strong>? Это
+            действие нельзя отменить.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
